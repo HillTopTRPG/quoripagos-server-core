@@ -292,10 +292,10 @@ export class CoreImpl implements Core {
     deleteFuncMap: Map<string, DeleteFunc>,
     updateFuncMap: Map<string, UpdateFunc>
   ) {
-    this.COLLECTION_ROOM = new SystemCollection(`rooms-${serverSetting.secretCollectionSuffix}`);
-    this.COLLECTION_TOUCH = new SystemCollection(`touch-list-${serverSetting.secretCollectionSuffix}`);
-    this.COLLECTION_SOCKET = new SystemCollection(`socket-list-${serverSetting.secretCollectionSuffix}`);
-    this.COLLECTION_TOKEN = new SystemCollection(`token-list-${serverSetting.secretCollectionSuffix}`);
+    this.COLLECTION_ROOM = new SystemCollection(`rooms`);
+    this.COLLECTION_TOUCH = new SystemCollection(`touch-list`);
+    this.COLLECTION_SOCKET = new SystemCollection(`socket-list`);
+    this.COLLECTION_TOKEN = new SystemCollection(`token-list`);
     this.db = db;
     this.bucket = bucket;
     this.accessUrl = accessUrl;

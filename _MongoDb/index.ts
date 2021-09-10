@@ -12,7 +12,7 @@ import {ApplicationError} from "../_error/ApplicationError";
 
 export async function connectMongoDb(connectionString: string, dbNameSuffix: string): Promise<Db> {
   const client = await MongoClient.connect(connectionString);
-  return client.db(`quoridorn-${dbNameSuffix}`);
+  return client.db(`quoripagos-${dbNameSuffix}`);
 }
 
 export async function dbApiGetDelegate(core: Core, socket: any, arg: string): Promise<StoreData<unknown>[]> {

@@ -78,7 +78,7 @@ export function compareVersion(
 export function stringToVersion(version: string | null): VersionInfo {
   if (!version)
     throw new ApplicationError(`Illegal argument. version=${version}`);
-  version = version.replace(/^Quoridorn /, "");
+  version = version.replace(/^Quoripagos /, "");
   const matchResult = version.match(
     /^([0-9]+)\.([0-9]+)\.([0-9]+)(?:(a|b|s|rc)([0-9]+))?/
   );

@@ -375,8 +375,6 @@ export type ServerSetting = {
   webApiPassword: string;
   webApiPathBase: string;
   webApiTokenExpires: number;
-  storeType: "memory" | "mongodb";
-  secretCollectionSuffix: string;
   mongodbConnectionStrings: string;
   roomCreatePassword: string;
   roomNum: number;
@@ -487,7 +485,7 @@ export default async function bootUp(
     }
   }, 1000 * 60); // 1分
 
-  console.log(`Quoridorn Server is Ready. (version: ${process.env.npm_package_version})`);
+  console.log(`Quoripagos Server is Ready. (version: ${process.env.npm_package_version})`);
 }
 
 export function readText(path: string): string {
@@ -509,7 +507,7 @@ export async function getTargetClient(
   if (!process.env.npm_package_version) {
     throw new SystemError(`The version is not set in package.json.`);
   }
-  const version: string = `Quoridorn ${process.env.npm_package_version.replace("-", "")}`;
+  const version: string = `Quoripagos ${process.env.npm_package_version.replace("-", "")}`;
   const targetClient: TargetClient = { from: null, to: null }
   const iList: Interoperability[] = readYaml(interoperabilityYamlPath);
   if (compareVersion(iList[0].server, version) <= 0) {
