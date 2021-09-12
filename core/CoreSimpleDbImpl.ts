@@ -44,14 +44,13 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
     if (ownerType && owner) {
       if (ownerType === "user-list") {
         const { data, collection } = await this.core._dbInner.dbFindOne<UserStore>({ key: owner }, [ownerType, cnPrefix]);
-        await this.core._dbInner.addRefList(socket, collection, share, data, { type: cnSuffix, key });
+        await this.core._dbInner.addRefList(socket, collection, data, { type: cnSuffix, key });
       }
     }
 
     await this.core._dbInner.updateMediaKeyRefList<T>(
       socket,
       cnPrefix,
-      share,
       data.data,
       data.collection,
       key,
@@ -84,13 +83,15 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
       throw new ApplicationError(`Failure add doc.`, addInfo);
     }
 
-    await this.core.socket.emitSocketEvent(
-      socket,
-      share,
-      "notify-insert-data",
-      null,
-      addInfo
-    );
+    if (!collection.collectionName.endsWith("-DATA-user-list")) {
+      await this.core.socket.emitSocketEvent(
+        socket,
+        share,
+        "notify-insert-data",
+        null,
+        addInfo
+      );
+    }
     return addInfo;
   }
 
@@ -114,14 +115,13 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
     const ownerKey = data.owner;
     if (ownerType && ownerKey) {
       const { data: ownerData, collection: ownerCollection } = await this.core._dbInner.dbFindOne<any>({ key: ownerKey }, [ownerType, cnPrefix]);
-      await this.core._dbInner.deleteRefList(socket, ownerCollection, share, ownerData, { type: cnSuffix, key });
+      await this.core._dbInner.deleteRefList(socket, ownerCollection, ownerData, { type: cnSuffix, key });
     }
 
     // データ中にmedia-listへの参照を含んでいた場合はmedia-listの参照情報を削除する
     await this.core._dbInner.updateMediaKeyRefList<T>(
       socket,
       cnPrefix,
-      share,
       data.data,
       cnSuffix,
       key,
@@ -134,19 +134,21 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
       throw new ApplicationError(`Failure delete doc.`, msgArg);
     }
 
-    await this.core.socket.emitSocketEvent(
-      socket,
-      share,
-      "notify-delete-data",
-      null,
-      {key, type: cnSuffix}
-    );
+    if (!collection.collectionName.endsWith("-DATA-user-list")) {
+      await this.core.socket.emitSocketEvent(
+        socket,
+        share,
+        "notify-delete-data",
+        null,
+        { key, type: cnSuffix }
+      );
+    }
   }
 
   public async updateSimple<T>(
     socket: any,
     collectionArg: CollectionArg<StoreData<T>>,
-    share: "room" | "room-mate" | "all" | "other" | "none",
+    share: "none" | string[] | "all" | "self" | "other" | "room" | "room-mate" | "room-mate-other-self" | 'self-other-socket',
     data: (Partial<StoreData<Partial<T>>> & { key: string })
   ): Promise<void> {
     const {socketInfo} = await this.core._dbInner.getSocketInfo(socket);
@@ -179,7 +181,6 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
         await this.core._dbInner.deleteRefList(
           socket,
           ownerCollection,
-          share,
           ownerData!,
           { type: cnSuffix, key: data.key! }
         );
@@ -192,7 +193,6 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
         await this.core._dbInner.addRefList(
           socket,
           ownerCollection,
-          share,
           ownerData,
           { type: cnSuffix, key: data.key! }
         )
@@ -214,7 +214,6 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
       await this.core._dbInner.updateMediaKeyRefList(
         socket,
         cnPrefix,
-        share,
         updateInfo.data,
         cnSuffix,
         data.key,
@@ -228,12 +227,16 @@ export class CoreSimpleDbImpl implements CoreSimpleDb {
       throw new ApplicationError(`Failure update doc.`, updateInfo);
     }
 
-    await this.core.socket.emitSocketEvent(
-      socket,
-      share,
-      "notify-update-data",
-      null,
-      updateInfo
-    );
+    if (collection.collectionName.endsWith("-DATA-user-list")) {
+      await this.core.socket.notifyUpdateUser(socket, updateInfo as StoreData<unknown> as StoreData<UserStore>);
+    } else {
+      await this.core.socket.emitSocketEvent(
+        socket,
+        share,
+        "notify-update-data",
+        null,
+        updateInfo
+      );
+    }
   }
 }

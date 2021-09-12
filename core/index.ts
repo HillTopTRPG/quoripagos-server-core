@@ -28,8 +28,8 @@ import {
   UserLoginRequest,
   SocketStore,
   DataReference,
-  StoreData, ClientUserData
-} from "../index";
+  StoreData, ClientUserData, UserStore
+} from '../index'
 import {CoreSocketImpl} from "./CoreSocketImpl";
 import {TargetClient} from "../_GitHub";
 
@@ -80,18 +80,19 @@ export interface CoreSocket {
   notifyProgress(socket: any, all: number, current: number): Promise<void>;
   emitSocketEvent<T>(
     socket: any,
-    sendTarget: "self" | "room" | "room-mate" | "all" | "other" | "none" | string[],
+    sendTarget: "none" | string[] | "all" | "self" | "other" | "room" | "room-mate" | "room-mate-other-self" | 'self-other-socket',
     event: string,
     error: any,
     payload: T
   ): Promise<void>;
+  notifyUpdateUser(socket: any, userData: StoreData<UserStore>): Promise<void>;
 }
 
 export interface CoreSimpleDb {
   addSimple<T>(
     socket: any,
     collectionArg: CollectionArg<StoreData<T>>,
-    share: "room" | "room-mate" | "all" | "other" | "none",
+    share: "none" | string[] | "all" | "self" | "other" | "room" | "room-mate" | "room-mate-other-self" | 'self-other-socket',
     force: boolean,
     isServerInner: boolean,
     data: Partial<StoreData<T>> & { data: T }
@@ -99,13 +100,13 @@ export interface CoreSimpleDb {
   deleteSimple<T>(
     socket: any,
     collectionArg: CollectionArg<StoreData<T>>,
-    share: "room" | "room-mate" | "all" | "other" | "none",
+    share: "none" | string[] | "all" | "self" | "other" | "room" | "room-mate" | "room-mate-other-self" | 'self-other-socket',
     key: string
   ): Promise<void>;
   updateSimple<T>(
     socket: any,
     collectionArg: CollectionArg<StoreData<T>>,
-    share: "room" | "room-mate" | "all" | "other" | "none",
+    share: "none" | string[] | "all" | "self" | "other" | "room" | "room-mate" | "room-mate-other-self" | 'self-other-socket',
     data: (Partial<StoreData<Partial<T>>> & { key: string })
   ): Promise<void>
 }
@@ -135,6 +136,7 @@ export interface CoreInner {
   deleteTouchedRoom(): Promise<number>;
   socketIn(socket: any): Promise<void>;
   socketOut(socket: any): Promise<void>;
+  updateAtBootUp(): Promise<void>;
 }
 
 export interface CoreDbInner {
@@ -160,14 +162,12 @@ export interface CoreDbInner {
   addRefList(
     socket: any,
     collection: Collection<StoreData<any>>,
-    share: "room" | "room-mate" | "all" | "other" | "none",
     data: StoreData<any> | null | undefined,
     refInfo: { type: string; key: string }
   ): Promise<void>;
   deleteRefList(
     socket: any,
     collection: Collection<StoreData<any>>,
-    share: "room" | "room-mate" | "all" | "other" | "none",
     data: StoreData<any> | null | undefined,
     refInfo: { type: string; key: string }
   ): Promise<void>;
@@ -183,7 +183,6 @@ export interface CoreDbInner {
   updateMediaKeyRefList<T>(
     socket: any,
     cnPrefix: string,
-    share: "room" | "room-mate" | "all" | "other" | "none",
     data: T,
     type: string,
     key: string,

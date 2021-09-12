@@ -1,5 +1,5 @@
 import {CoreSocket} from "./index";
-import {Core, UploadMediaInfo} from "../index";
+import { ClientUserData, Core, StoreData, UploadMediaInfo, UserStore } from '../index'
 
 export class CoreSocketImpl implements CoreSocket {
   public constructor(private core: Core) {}
@@ -13,7 +13,7 @@ export class CoreSocketImpl implements CoreSocket {
     socket.on(eventName, async (arg: T) => {
       const resultEventRaw = resultEventGetter(arg)
       const resultEvent = resultEventRaw !== null ? resultEventRaw : `result-${eventName}`;
-      console.log(`socket.on ${eventName}`);
+      // console.log(`socket.on ${eventName}`);
       const logArg = arg ? JSON.parse(JSON.stringify(arg)) : null;
       if (eventName === "upload-media") {
         logArg.uploadMediaInfoList.forEach((info: UploadMediaInfo) => {
@@ -45,9 +45,25 @@ export class CoreSocketImpl implements CoreSocket {
     if (all > 1) this.core.io.to(socket.id).emit("notify-progress", null, { all, current });
   }
 
+  public async notifyUpdateUser(socket: any, userData: StoreData<UserStore>): Promise<void> {
+    const payload: ClientUserData = {
+      refList: userData.refList,
+      name: userData.data!.name,
+      type: userData.data!.type,
+      login: userData.data!.login
+    }
+    const payloadSelf: ClientUserData = {
+      key: userData.key,
+      ...payload
+    }
+    await this.emitSocketEvent<ClientUserData>(socket,"self", "notify-user-update", null, payloadSelf);
+    await this.emitSocketEvent<ClientUserData>(socket,"self-other-socket", "notify-user-update", null, payloadSelf);
+    await this.emitSocketEvent<ClientUserData>(socket, "room-mate-other-self", "notify-user-update", null, payload);
+  }
+
   public async emitSocketEvent<T>(
     socket: any,
-    sendTarget: "self" | "room" | "room-mate" | "all" | "other" | "none" | string[],
+    sendTarget: "none" | string[] | "all" | "self" | "other" | "room" | "room-mate" | "room-mate-other-self" | 'self-other-socket',
     event: string,
     error: any,
     payload: T
@@ -72,8 +88,15 @@ export class CoreSocketImpl implements CoreSocket {
     const {socketInfoList} = await this.core._dbInner.getRoomMateSocketInfoList(socket);
     await this.core.lib.gatlingAsync(
       socketInfoList
-        .filter((_, idx) => sendTarget === "room" ? true : idx > 0)
-        .map(async info => this.core.io.sockets.to(info.socketId).emit(event, error, payload))
+        .filter((data, idx) => {
+          if (sendTarget === 'room-mate') return idx > 0;
+          if (sendTarget === 'self-other-socket') return data.userName === socketInfoList[0].userName && data.socketId !== socketInfoList[0].socketId
+          if (sendTarget === 'room-mate-other-self') return data.userName !== socketInfoList[0].userName
+          return true;
+        })
+        .map(async info => {
+          this.core.io.sockets.to(info.socketId).emit(event, error, payload);
+        })
     );
   }
 }

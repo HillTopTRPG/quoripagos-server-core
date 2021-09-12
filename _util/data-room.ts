@@ -345,9 +345,12 @@ export async function roomApiLoginUserDelegate(
   if (!roomData)
     throw new ApplicationError(`No such room.`, { roomKey: socketInfo.roomKey });
 
+  const userName = arg.name;
+
   // ユーザコレクションの取得とユーザ情報更新
   const cnPrefix = roomData.data!.roomCollectionPrefix;
-  const {data: userData, collection: userCollection} = await core._dbInner.dbFindOne<UserStore>({ "data.name": arg.name }, ["user-list", cnPrefix]);
+  const {data: userDataRaw, collection: userCollection} = await core._dbInner.dbFindOne<UserStore>({ "data.name": userName }, ["user-list", cnPrefix]);
+  let userData = userDataRaw
 
   let addLoggedInFlag: boolean = true;
   let addMemberNumFlag: boolean = !userData;
@@ -357,83 +360,49 @@ export async function roomApiLoginUserDelegate(
     arg.type = "visitor";
 
   let userLoginResponse: UserLoginResponse;
-  let userKey: string;
-
-  const notifyUserUpdate = async (userKey: string, userData: StoreData<UserStore>): Promise<void> => {
-    await core.socket.emitSocketEvent<ClientUserData>(
-      socket,
-      "self",
-      "notify-user-update",
-      null,
-      {
-        key: userKey,
-        refList: userData.refList,
-        name: userData.data!.name,
-        type: userData.data!.type,
-        login: userData.data!.login
-      }
-    );
-    await core.socket.emitSocketEvent<ClientUserData>(
-      socket,
-      "room-mate",
-      "notify-user-update",
-      null,
-      {
-        refList: userData.refList,
-        name: userData.data!.name,
-        type: userData.data!.type,
-        login: userData.data!.login
-      }
-    );
-  }
 
   if (!userData) {
-    console.log("User追加")
-    const password = await hash(arg.password);
     const token = core.lib.makeKey();
-
-    const insertedData = await core._simpleDb.addSimple<UserStore>(
+    userData = await core._simpleDb.addSimple<UserStore>(
       socket,
       userCollection,
       "none",
       true,
       true,
       {
+        owner: null,
+        ownerType: null,
         data: {
-          name: arg.name,
+          name: userName,
           type: arg.type,
           login: 1,
           token,
-          password,
+          password: await hash(arg.password),
           isExported: false
         }
       }
     );
 
-    userKey = insertedData.key;
+    await socketCollection.updateOne({ socketId: socket.id }, [{ $addFields: { userKey: userData.key, userName } }])
 
     // クライアントへの通知
-    await notifyUserUpdate(userKey, insertedData);
+    await core.socket.notifyUpdateUser(socket, userData);
 
     userLoginResponse = {
-      userKey: insertedData.key,
+      userKey: userData.key,
       token
     };
   } else {
-    console.log("User更新")
-
-    // ユーザが存在した場合
-    userKey = userData.key;
-
     userLoginResponse = {
-      userKey,
+      userKey: userData.key,
       token: userData.data!.token
     };
+
     let verifyResult;
     try {
       verifyResult = await verify(userData.data!.password, arg.password);
     } catch (err) {
-      throw new SystemError(`Login verify fatal error. user-name=${arg.name}`);
+      throw new SystemError(`Login verify fatal error. user-name=${userName}`);
     }
 
     // パスワードチェックで引っかかった
@@ -443,18 +412,15 @@ export async function roomApiLoginUserDelegate(
     userData.data!.login++;
     addLoggedInFlag = userData.data!.login === 1;
 
+    await socketCollection.updateOne({ socketId: socket.id }, [{ $addFields: { userKey: userData.key, userName } }])
+
     await core._simpleDb.updateSimple(socket, userCollection, "none", {
-      key: userKey,
+      key: userData.key,
       data: {
         login: userData.data!.login
       }
     });
-
-    // クライアントへの通知
-    await notifyUserUpdate(userKey, userData);
   }
-
-  await socketCollection.updateOne({ socketId: socket.id }, [{ $addFields: { userKey } }])
 
   if (addLoggedInFlag) roomData.data!.loggedIn++;
   if (addMemberNumFlag) roomData.data!.memberNum++;

@@ -1,6 +1,6 @@
 import {ApplicationError} from "../_error/ApplicationError";
 import {CoreInner} from "./index";
-import {ClientRoomData, ClientUserData, Core, RoomStore, SocketStore, StoreData, TokenStore, UserStore} from "../index";
+import {ClientRoomData, Core, RoomStore, SocketStore, StoreData, TokenStore, UserStore} from "../index";
 
 export class CoreInnerImpl implements CoreInner {
   public constructor(private core: Core) {}
@@ -9,6 +9,30 @@ export class CoreInnerImpl implements CoreInner {
     const collection = await this.core._dbInner.getCollection<TokenStore>(this.core.COLLECTION_TOKEN, false);
     const result = await collection.deleteMany({ expires: { $lt: Date.now() } });
     return result.deletedCount;
+  }
+
+  /**
+   * bootUp時にDBの内容を整える
+   */
+  public async updateAtBootUp(): Promise<void> {
+    // socket接続情報を初期化
+    const socketCollection = await this.core._dbInner.getCollection<SocketStore>(this.core.COLLECTION_SOCKET, false);
+    await socketCollection.deleteMany({});
+
+    // 入室済み人数を初期化
+    const roomCollection = await this.core._dbInner.getCollection<StoreData<RoomStore>>(this.core.COLLECTION_ROOM, false);
+    await roomCollection.updateMany({}, [{$addFields: { data: { memberNum: 0 } }}]);
+
+    // ユーザのログイン済み人数を初期化
+    // 非同期処理を直列で実行していく
+    const roomStoreList = await roomCollection.find().toArray();
+    await this.core.lib.gatlingAsync<void>(
+      roomStoreList.map(async room => {
+        const roomCollectionPrefix = room.data?.roomCollectionPrefix;
+        const userListCollection = await this.core._dbInner.getCollection<StoreData<UserStore>>(["user-list", roomCollectionPrefix], false);
+        await userListCollection.updateMany({}, [{$addFields: { data: { login: 0 } } }]);
+      })
+    );
   }
 
   public async deleteTouchedRoom(): Promise<number> {
@@ -40,16 +64,15 @@ export class CoreInnerImpl implements CoreInner {
         roomKey: null,
         roomCollectionPrefix: null,
         storageId: null,
-        userKey: null
+        userKey: null,
+        userName: null
       },
       this.core.COLLECTION_SOCKET
     )
   }
 
   public async socketOut(socket: any): Promise<void> {
-    console.log("socketOut")
     const {socketInfo, socketCollection} = await this.core._dbInner.getSocketInfo(socket);
-    console.log(JSON.stringify(socketInfo, null, "  "))
 
     if (socketInfo.roomKey && !socketInfo.roomCollectionPrefix) {
       // タッチした部屋を解放
@@ -89,42 +112,23 @@ export class CoreInnerImpl implements CoreInner {
       if (!userInfo)
         throw new ApplicationError(`No such user. user-key=${socketInfo.userKey}`);
 
-      console.log("ログイン数変化")
       userInfo.data!.login--;
-      console.log(userInfo.data!.login);
 
       const updateUserInfo = { key: socketInfo.userKey, data: {login: userInfo.data!.login} };
       await this.core._simpleDb.updateSimple(
         socket,
         userCollection,
-        "room-mate",
+        "none",
         updateUserInfo
       );
 
-      // クライアントへの通知
-      await this.core.socket.emitSocketEvent<ClientUserData>(
-        socket,
-        "room-mate",
-        "notify-user-update",
-        null,
-        {
-          refList: userInfo.refList,
-          name: userInfo.data!.name,
-          type: userInfo.data!.type,
-          login: userInfo.data!.login
-        }
-      );
-
       if (userInfo.data!.login === 0) {
-        console.log("部屋人数変化")
-        console.log(roomInfo.data!.loggedIn)
         roomInfo.data!.loggedIn--;
         const updateDateTime = Date.now();
         await roomCollection.updateOne(
           { key: socketInfo.roomKey },
           [{ $addFields: { data: {loggedIn: roomInfo.data!.loggedIn}, updateDateTime } }]
         );
-        console.log(roomInfo.data!.loggedIn)
 
         // クライアントへの通知
         await this.core.socket.emitSocketEvent<ClientRoomData>(

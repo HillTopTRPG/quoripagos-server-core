@@ -85,7 +85,6 @@ export class CoreDbInnerImpl implements CoreDbInner {
   public async addRefList(
     socket: any,
     collection: Collection<StoreData<any>>,
-    share: "room" | "room-mate" | "all" | "other" | "none",
     data: StoreData<any> | null | undefined,
     refInfo: { type: string; key: string }
   ): Promise<void> {
@@ -95,7 +94,7 @@ export class CoreDbInnerImpl implements CoreDbInner {
     await this.core._simpleDb.updateSimple<any>(
       socket,
       collection,
-      share,
+      "room",
       { key: data.key, refList: data.refList }
     );
   }
@@ -103,7 +102,6 @@ export class CoreDbInnerImpl implements CoreDbInner {
   public async deleteRefList(
     socket: any,
     collection: Collection<StoreData<any>>,
-    share: "room" | "room-mate" | "all" | "other" | "none",
     data: StoreData<any> | null | undefined,
     refInfo: { type: string; key: string }
   ): Promise<void> {
@@ -116,7 +114,7 @@ export class CoreDbInnerImpl implements CoreDbInner {
       await this.core._simpleDb.updateSimple<any>(
         socket,
         collection,
-        share,
+        "room",
         { key: data.key, refList: data.refList }
       );
     }
@@ -170,7 +168,6 @@ export class CoreDbInnerImpl implements CoreDbInner {
   public async updateMediaKeyRefList<T>(
     socket: any,
     cnPrefix: string,
-    share: "room" | "room-mate" | "all" | "other" | "none",
     data: T,
     type: string,
     key: string,
@@ -188,9 +185,9 @@ export class CoreDbInnerImpl implements CoreDbInner {
             [ "media-list", cnPrefix]
           );
           if (operation === "add") {
-            await this.addRefList(socket, collection, share, data, { type, key });
+            await this.addRefList(socket, collection, data, { type, key });
           } else {
-            await this.deleteRefList(socket, collection, share, data, { type, key });
+            await this.deleteRefList(socket, collection, data, { type, key });
           }
         })
       );

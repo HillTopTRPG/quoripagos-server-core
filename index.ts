@@ -58,6 +58,8 @@ export type SocketStore = {
   storageId: string | null;
   // ユーザログイン時に設定
   userKey: string | null;
+  // ユーザログイン時に設定
+  userName: string | null;
 }
 export type IconClass =
   | "icon-warning"
@@ -472,6 +474,8 @@ export default async function bootUp(
       { ok: true }
     );
   });
+
+  await core._inner.updateAtBootUp();
 
   // 1分おきにDBを監視
   setInterval(async () => {
