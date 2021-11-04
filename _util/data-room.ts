@@ -477,7 +477,7 @@ export async function roomApiDeleteRoomDelegate(
     throw new SystemError(`Login verify fatal error. room-no=${arg.roomNo}`);
   }
 
-  if (!verifyResult) throw new ApplicationError("Invalid _password.")
+  if (!verifyResult) throw new ApplicationError("Invalid password.")
 
   await collection.deleteOne({ key: data.key });
 
@@ -502,10 +502,9 @@ export async function roomApiDeleteRoomDelegate(
   await core.s3Client.removeObjects(bucket, deleteUrlList);
 
   // 部屋のコレクションの削除
-  await core.lib.gatlingAsync(
-    (await core._dbInner.getAllCollection(cnPrefix))
-      .map(cnSuffix => `${cnPrefix}-DATA-${cnSuffix}`)
-      .map(cnSuffix => core.db.collection(`${cnPrefix}-DATA-${cnSuffix}`).drop())
-  );
-  await core.db.collection(`${cnPrefix}-DATA-collection-list`).drop();
+  const collectionNameList = (await core._dbInner.getAllCollection(cnPrefix)).map(cnSuffix => `${cnPrefix}-DATA-${cnSuffix}`)
+  if (collectionNameList.length) {
+    await core.lib.gatlingAsync(collectionNameList.map(collectionName => core.db.collection(collectionName).drop()));
+    await core.db.collection(`${cnPrefix}-DATA-collection-list`).drop();
+  }
 }

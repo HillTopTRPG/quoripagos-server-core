@@ -1,6 +1,6 @@
 {
   "name": "quoripagos-server-core",
-  "version": "0.0.19",
+  "version": "0.0.31",
   "description": "",
   "main": "dist/index.js",
   "private": false,
