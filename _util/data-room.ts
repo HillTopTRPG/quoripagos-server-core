@@ -298,10 +298,12 @@ async function login(
   // ユーザ一覧を返却
   const {dataList} = await core._dbInner.dbFind<UserStore>({}, ["user-list", cnPrefix]);
   return dataList.map(d => ({
+    key: d.key,
     login: d.data!.login,
     refList: d.refList,
     name: d.data!.name,
-    type: d.data!.type
+    type: d.data!.type,
+    socketIdList: d.data!.socketIdList
   }));
 }
 
@@ -378,7 +380,8 @@ export async function roomApiLoginUserDelegate(
           login: 1,
           token,
           password: await hash(arg.password),
-          isExported: false
+          isExported: false,
+          socketIdList: [socket.id]
         }
       }
     );
@@ -410,6 +413,7 @@ export async function roomApiLoginUserDelegate(
 
     // 人数更新
     userData.data!.login++;
+    userData.data!.socketIdList.push(socket.id);
     addLoggedInFlag = userData.data!.login === 1;
 
     await socketCollection.updateOne({ socketId: socket.id }, [{ $addFields: { userKey: userData.key, userName } }])
@@ -417,7 +421,9 @@ export async function roomApiLoginUserDelegate(
     await core._simpleDb.updateSimple(socket, userCollection, "none", {
       key: userData.key,
       data: {
-        login: userData.data!.login
+        login: userData.data!.login,
+        socketIdList: userData.data!.socketIdList,
+        type: arg.type
       }
     });
   }

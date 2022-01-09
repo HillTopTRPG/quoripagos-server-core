@@ -134,11 +134,12 @@ export type MediaStore = {
 };
 
 export type ClientUserData = {
-  key?: string;
+  key: string;
   refList: DataReference[];
   name: string;
   type: UserType;
   login: number;
+  socketIdList: string[];
 }
 
 /**
@@ -152,6 +153,7 @@ export type UserStore = {
   password: string;
   isExported: boolean;
   token: string;
+  socketIdList: string[];
 };
 /**
  * DBに格納されるデータのラッパー

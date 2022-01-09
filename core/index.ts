@@ -28,7 +28,9 @@ import {
   UserLoginRequest,
   SocketStore,
   DataReference,
-  StoreData, ClientUserData, UserStore
+  StoreData,
+  ClientUserData,
+  UserStore
 } from '../index'
 import {CoreSocketImpl} from "./CoreSocketImpl";
 import {TargetClient} from "../_GitHub";

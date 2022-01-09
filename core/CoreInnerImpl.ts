@@ -113,8 +113,10 @@ export class CoreInnerImpl implements CoreInner {
         throw new ApplicationError(`No such user. user-key=${socketInfo.userKey}`);
 
       userInfo.data!.login--;
+      const socketIdIdx = userInfo.data!.socketIdList.findIndex(id => id === socket.id);
+      userInfo.data!.socketIdList.splice(socketIdIdx, 1);
 
-      const updateUserInfo = { key: socketInfo.userKey, data: {login: userInfo.data!.login} };
+      const updateUserInfo = { key: socketInfo.userKey, data: {login: userInfo.data!.login, socketIdList: userInfo.data!.socketIdList} };
       await this.core._simpleDb.updateSimple(
         socket,
         userCollection,

@@ -47,17 +47,15 @@ export class CoreSocketImpl implements CoreSocket {
 
   public async notifyUpdateUser(socket: any, userData: StoreData<UserStore>): Promise<void> {
     const payload: ClientUserData = {
+      key: userData.key,
       refList: userData.refList,
       name: userData.data!.name,
       type: userData.data!.type,
-      login: userData.data!.login
+      login: userData.data!.login,
+      socketIdList: [...userData.data!.socketIdList]
     }
-    const payloadSelf: ClientUserData = {
-      key: userData.key,
-      ...payload
-    }
-    await this.emitSocketEvent<ClientUserData>(socket,"self", "notify-user-update", null, payloadSelf);
-    await this.emitSocketEvent<ClientUserData>(socket,"self-other-socket", "notify-user-update", null, payloadSelf);
+    await this.emitSocketEvent<ClientUserData>(socket,"self", "notify-user-update", null, payload);
+    await this.emitSocketEvent<ClientUserData>(socket,"self-other-socket", "notify-user-update", null, payload);
     await this.emitSocketEvent<ClientUserData>(socket, "room-mate-other-self", "notify-user-update", null, payload);
   }
 
@@ -69,16 +67,24 @@ export class CoreSocketImpl implements CoreSocket {
     payload: T
   ): Promise<void> {
     if (sendTarget === "none") return;
+    const socketIdList: string[] | undefined = (payload as any).socketIdList;
     if (typeof sendTarget !== "string") {
-      await this.core.lib.gatlingAsync<void>(sendTarget.map(async t =>
+      await this.core.lib.gatlingAsync<void>(sendTarget.map(async t => {
         this.core.io.sockets.to(t).emit(event, error, payload)
-      ));
+      }));
       return;
     }
     if (sendTarget === "all") {
       return await this.core.io.sockets.emit(event, error, payload);
     }
     if (sendTarget === "self") {
+      if (socketIdList) {
+        const socketIdIdx = socketIdList.findIndex(id => id === socket.id);
+        if (socketIdIdx >= 0) {
+          socketIdList.splice(socketIdIdx, 1);
+          socketIdList.unshift(socket.id);
+        }
+      }
       return await socket.emit(event, error, payload);
     }
     if (sendTarget === "other") {
@@ -95,6 +101,15 @@ export class CoreSocketImpl implements CoreSocket {
           return true;
         })
         .map(async info => {
+          if (sendTarget === 'self-other-socket') {
+            if (socketIdList) {
+              const socketIdIdx = socketIdList.findIndex(id => id === info.socketId);
+              if (socketIdIdx >= 0) {
+                socketIdList.splice(socketIdIdx, 1);
+                socketIdList.unshift(info.socketId);
+              }
+            }
+          }
           this.core.io.sockets.to(info.socketId).emit(event, error, payload);
         })
     );
